@@ -1,0 +1,2 @@
+# MasterCoin
+MasterCoin
