@@ -49,7 +49,7 @@ typedef std::map<int, int> intMap;
 static std::map<int, int> masternodeTiers = map_list_of (1, 3500) (2, 35000) (3, 100000); 
 
 // Masternode tier rewards
-static std::map<int, int> masternodeTierRewards = map_list_of (1, 16.25) (2, 170) (3, 500); 
+static std::map<int, double> masternodeTierRewards = map_list_of (1, 16.25) (2, 170) (3, 500); 
 
 //
 // The Masternode Class. For managing the darksend process. It contains the input of exact amount of MasterCoin, signature to prove

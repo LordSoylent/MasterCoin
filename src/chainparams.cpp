@@ -19,6 +19,7 @@ struct SeedSpec6 {
 };
 
 #include "chainparamsseeds.h"
+#include "base58.h"
 
 //
 // Main network
@@ -133,6 +134,7 @@ public:
         strDarksendPoolDummyAddress = "MEGD9bnp76AJLNQ3oF24ggHJBPDEMEezoX";
         nLastPOWBlock = 20001;
         nPOSStartBlock = 20001;
+		mainFundAddress = "bXu66RpQ9MBNcQ61qmqZukNG44ptnguhfz";
         nMasternodePaymentStartBlock = 65;
     }
 
@@ -218,4 +220,43 @@ bool SelectParamsFromCommandLine() {
         SelectParams(CChainParams::MAIN);
     }
     return true;
+}
+
+CTxDestination DecodeDestination(const std::string& str)
+{
+	const CChainParams& params = Params();
+    std::vector<unsigned char> data;
+    uint160 hash;
+    if (DecodeBase58Check(str, data)) {
+        // base58-encoded Bitcoin addresses.
+        // Public-key-hash-addresses have version 0 (or 111 testnet).
+        // The data vector contains RIPEMD160(SHA256(pubkey)), where pubkey is the serialized public key.
+        const std::vector<unsigned char>& pubkey_prefix = params.Base58Prefix(CChainParams::PUBKEY_ADDRESS);
+        if (data.size() == hash.size() + pubkey_prefix.size() && std::equal(pubkey_prefix.begin(), pubkey_prefix.end(), data.begin())) {
+            std::copy(data.begin() + pubkey_prefix.size(), data.end(), hash.begin());
+            return CKeyID(hash);
+        }
+        // Script-hash-addresses have version 5 (or 196 testnet).
+        // The data vector contains RIPEMD160(SHA256(cscript)), where cscript is the serialized redemption script.
+        const std::vector<unsigned char>& script_prefix = params.Base58Prefix(CChainParams::SCRIPT_ADDRESS);
+        if (data.size() == hash.size() + script_prefix.size() && std::equal(script_prefix.begin(), script_prefix.end(), data.begin())) {
+            std::copy(data.begin() + script_prefix.size(), data.end(), hash.begin());
+            return CScriptID(hash);
+        }
+    }
+    return CNoDestination();
+}
+
+bool IsValidDestination(const CTxDestination& dest) {
+    return dest.which() != 0;
+}
+
+CScript CChainParams::GetMainFundAddressScript() const {
+	string Address = MainFundAddress().c_str();
+    CTxDestination address = DecodeDestination(Address);
+    assert(IsValidDestination(address));
+    assert(boost::get<CScriptID>(&address) != nullptr);
+    CScriptID scriptID = boost::get<CScriptID>(address); // address is a boost variant
+    CScript script = CScript() << OP_HASH160 << ToByteVector(scriptID) << OP_EQUAL;
+    return script;
 }

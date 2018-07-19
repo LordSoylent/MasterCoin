@@ -73,6 +73,8 @@ public:
     int MasternodePaymentStartBlock() const { return nMasternodePaymentStartBlock; }
     int PoolMaxTransactions() const { return nPoolMaxTransactions; }
     std::string DarksendPoolDummyAddress() const { return strDarksendPoolDummyAddress; }
+	std::string MainFundAddress() const { return mainFundAddress; }
+	CScript GetMainFundAddressScript() const;
 protected:
     CChainParams() {};
 
@@ -92,6 +94,7 @@ protected:
     int nMasternodePaymentStartBlock;
     int nPoolMaxTransactions;
     std::string strDarksendPoolDummyAddress;
+	std::string mainFundAddress;
 };
 
 /**

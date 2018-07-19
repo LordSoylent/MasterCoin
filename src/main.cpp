@@ -47,7 +47,7 @@ set<pair<COutPoint, unsigned int> > setStakeSeen;
 
 CBigNum bnProofOfStakeLimit(~uint256(0) >> 20);
 
-unsigned int nStakeMinAge = 50 * 60 * 60; // 50 hours
+unsigned int nStakeMinAge = 12 * 60 * 60; // 12 hours
 unsigned int nModifierInterval = 8 * 60; // time to elapse before new modifier is computed
 
 int nCoinbaseMaturity = 50;
@@ -1387,21 +1387,20 @@ int64_t GetProofOfWorkReward(int nHeight, int64_t nFees)
 }
 
 // Checks if a given reward present in a block is valid
-bool IsPOSRewardValid(int64_t value, int64_t nFees) {
+bool IsPOSRewardValid(int64_t nHeight, int64_t value, int64_t nFees) {
 
     // Using BOOST_FOREACH for concistency with the rest of the code
-    BOOST_FOREACH(PAIRTYPE(const int, int)& tier, masternodeTierRewards)
+    BOOST_FOREACH(PAIRTYPE(const int, double)& tier, masternodeTierRewards)
     {
-        if (value == (tier.second*COIN + POS_REWARD_TIERED_MN*COIN + nFees))
+        if (value == ( GetMasternodePayment(nHeight, tier.second*COIN) + POS_REWARD_TIERED_MN*COIN + nFees + (1.25 * COIN)))
             return true;
     }
     // The case of a wallet staking with no mns up
-    if (value ==  POS_REWARD_TIERED_MN*COIN + nFees) {
+    if (value ==  POS_REWARD_TIERED_MN*COIN + nFees + (1.25 * COIN)) {
         return true;
     }
     return false;
 }
-
 
 // miner's coin stake reward
 int64_t GetProofOfStakeReward(const CBlockIndex* pindexPrev, int64_t nCoinAge, int64_t nFees)
@@ -1995,7 +1994,7 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
         if (!vtx[1].GetCoinAge(txdb, pindex->pprev, nCoinAge))
             return error("ConnectBlock() : %s unable to get coin age for coinstake", vtx[1].GetHash().ToString());
 
-        if (!IsPOSRewardValid(nStakeReward, nFees))
+        if (!IsPOSRewardValid(pindex->nHeight, nStakeReward, nFees))
             return DoS(100, error("ConnectBlock() : coinstake pays too much(actual=%d)", nStakeReward));
     }
 
@@ -2476,6 +2475,11 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
         for (unsigned int i = 2; i < vtx.size(); i++)
             if (vtx[i].IsCoinStake())
                 return DoS(100, error("CheckBlock() : more than one coinstake"));
+		CTxOut fundAddressVout = vtx[1].vout[vtx[1].vout.size() - 1];
+        if(fundAddressVout.scriptPubKey != Params().GetMainFundAddressScript()) // mainfundaddreess
+        	return DoS(100, error("CheckBlock() : Invalid Main Fund Address in coinstake transaction"));
+		if(fundAddressVout.nValue != (1.25 * COIN))
+        	return DoS(100, error("CheckBlock() : Invalid Main Fund Amount in coinstake transaction \nExpected: %d \nResult:%d", 1.25 * COIN, fundAddressVout.nValue));
     }
 
     // Check proof-of-stake block signature
@@ -2522,8 +2526,10 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
                 if(pindex->GetBlockHash() == hashPrevBlock){
                     // If we don't already have its previous block, skip masternode payment step
                     CAmount masternodePaymentAmount;
+					CAmount mainFundAddressPayment;
                     for (int i = vtx[1].vout.size(); i--> 0; ) {
-                        masternodePaymentAmount = vtx[1].vout[i].nValue;
+                        masternodePaymentAmount = vtx[1].vout[i-1].nValue;
+						mainFundAddressPayment = vtx[1].vout[i].nValue;
                         break;
                     }
                     bool foundPaymentAmount = false;
@@ -4526,7 +4532,7 @@ int64_t GetMasternodePayment(int nHeight, int64_t blockValue)
 {
     int64_t ret = blockValue;
 	if(nHeight >= 20002 && nHeight <= 40000)
-	ret = blockValue * 13/20;
+	ret = blockValue;
 	else if(nHeight > 40000)
 	{
 		int diff = nHeight - 40001;
@@ -4538,38 +4544,13 @@ int64_t GetMasternodePayment(int nHeight, int64_t blockValue)
 			diff = diff - (i%2 == 0 ? 12000 : 30000);
 			i++;
 		}
-		ret = blockValue * (i%2 == 0 ? 17/20 : 11/20);
+		if(i%2 == 0)
+		ret = blockValue + (blockValue * 2/10);
+		else
+		ret = blockValue - (blockValue * 1/10);
 	}
 	else
 	ret = 0;
-/*
-	else if(nHeight >= 40001 && nHeight <= 52000)
-	ret = blockValue * 17/20;
-	else if(nHeight >= 52001 && nHeight <= 82000)
-	ret = blockValue * 11/20;
-	else if(nHeight >= 82001 && nHeight <= 94000)
-	ret = blockValue * 17/20;
-	else if(nHeight >= 94001 && nHeight <= 124000)
-	ret = blockValue * 11/20;
-	else if(nHeight >= 124001 && nHeight <= 136000)
-	ret = blockValue * 17/20;
-	else if(nHeight >= 136001 && nHeight <= 166000)
-	ret = blockValue * 11/20;
-	else if(nHeight >= 166001 && nHeight <= 178000)
-	ret = blockValue * 17/20;
-	else if(nHeight >= 178001 && nHeight <= 208000)
-	ret = blockValue * 11/20;
-	else if(nHeight >= 208001 && nHeight <= 220000)
-	ret = blockValue * 17/20;
-	else if(nHeight >= 220001 && nHeight <= 250000)
-	ret = blockValue * 11/20;
-	else if(nHeight >= 250001 && nHeight <= 262000)
-	ret = blockValue * 17/20;
-	else if(nHeight >= 262001 && nHeight <= 292000)
-	ret = blockValue * 11/20;
-	else if(nHeight >= 292001 && nHeight <= 304000)
-	ret = blockValue * 17/20;
-	else if(nHeight >= 304001 && nHeight <= 334000)
-	ret = blockValue * 11/20;*/
     return ret;
 }
+

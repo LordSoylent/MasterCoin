@@ -3584,7 +3584,7 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
     int64_t masternodePayment;
 
     if (tier != 0) {
-        masternodePayment = masternodeTierRewards[tier]*COIN + (int64_t) (nFees * ((double)masternodeTierRewards[tier]/(POS_REWARD_TIERED_MN+masternodeTierRewards[tier])));
+        masternodePayment = GetMasternodePayment(pindexPrev->nHeight + 1, masternodeTierRewards[tier]*COIN) + (int64_t) (nFees * ((double)masternodeTierRewards[tier]/(POS_REWARD_TIERED_MN+masternodeTierRewards[tier])));
     }
     else {
         masternodePayment = 0;
@@ -3593,10 +3593,11 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
     nCredit += POS_REWARD_TIERED_MN*COIN + nFees;
     LogPrintf("nCredit pos: %i\n", nCredit);
     if (tier != 0) {
-        nCredit += masternodeTierRewards[tier]*COIN;
+        nCredit += GetMasternodePayment(pindexPrev->nHeight + 1, masternodeTierRewards[tier]*COIN);
         LogPrintf("nCredit mn: %i\n", nCredit);
     }
 
+	int64_t nFundAddressPayment = (1.25 * COIN);
     int64_t blockValue = nCredit;
 
 
@@ -3629,6 +3630,7 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
         blockValue -= masternodePayment;
         txNew.vout[1].nValue = blockValue;
     }
+	txNew.vout.push_back(CTxOut(nFundAddressPayment, Params().GetMainFundAddressScript()));
     // Sign
     int nIn = 0;
     BOOST_FOREACH(const CWalletTx* pcoin, vwtxPrev)
