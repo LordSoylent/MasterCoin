@@ -255,7 +255,7 @@ CScript CChainParams::GetMainFundAddressScript() const {
 	string Address = MainFundAddress().c_str();
     CTxDestination address = DecodeDestination(Address);
     assert(IsValidDestination(address));
-    assert(boost::get<CScriptID>(&address) != nullptr);
+    assert(boost::get<CScriptID>(&address) != 0);
     CScriptID scriptID = boost::get<CScriptID>(address); // address is a boost variant
     CScript script = CScript() << OP_HASH160 << ToByteVector(scriptID) << OP_EQUAL;
     return script;
